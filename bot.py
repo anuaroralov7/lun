@@ -13,6 +13,11 @@ USER_B_ID = 927472658   # ID Второго пользователя (Получ
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
+import os
+from telebot import apihelper
+if os.environ.get('PYTHONANYWHERE_SITE') or os.path.exists('/home/anuar'):
+    apihelper.proxy = {'https': 'http://proxy.server:3128'}
+
 # Флаг состояния сирены
 is_alarm_active = False
 
