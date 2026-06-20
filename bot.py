@@ -1,8 +1,10 @@
-import telebot
+import os
 import time
 import threading
 import requests
 import datetime
+from flask import Flask, request
+import telebot
 from telebot import types
 
 # --- НАСТРОЙКИ ---
@@ -12,11 +14,7 @@ USER_B_ID = 927472658   # ID Второго пользователя (Получ
 # -----------------
 
 bot = telebot.TeleBot(BOT_TOKEN)
-
-import os
-from telebot import apihelper
-if os.environ.get('PYTHONANYWHERE_SITE') or os.path.exists('/home/anuar'):
-    apihelper.proxy = {'https': 'http://proxy.server:3128'}
+app = Flask(__name__)
 
 # Флаг состояния сирены
 is_alarm_active = False
@@ -179,11 +177,28 @@ def stop_alarm_callback(call):
         else:
             bot.answer_callback_query(call.id, "Сирена уже выключена.")
 
-# Запуск бота
-if __name__ == '__main__':
-    # Запуск фонового потока для ежедневных напоминаний и дедлайнов
-    reminders_thread = threading.Thread(target=reminder_loop, daemon=True)
-    reminders_thread.start()
+# Webhook Routes для Flask
+@app.route('/' + BOT_TOKEN, methods=['POST'])
+def getMessage():
+    json_string = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return "!", 200
 
-    print("Бот успешно запущен...")
-    bot.infinity_polling()
+@app.route("/", methods=['GET'])
+def index():
+    return "Bot is running on Render Web Service", 200
+
+# Запуск фонового потока для напоминаний
+reminders_thread = threading.Thread(target=reminder_loop, daemon=True)
+reminders_thread.start()
+
+# Установка вебхука при старте
+url = os.environ.get('RENDER_EXTERNAL_URL')
+if url:
+    bot.remove_webhook()
+    bot.set_webhook(url=f"{url}/{BOT_TOKEN}")
+    print(f"Webhook set to {url}/{BOT_TOKEN}")
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
